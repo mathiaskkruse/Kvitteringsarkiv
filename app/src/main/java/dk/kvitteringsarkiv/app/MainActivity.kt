@@ -12,11 +12,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.documentfile.provider.DocumentFile
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import dk.kvitteringsarkiv.app.data.ReceiptDatabase
 import dk.kvitteringsarkiv.app.data.ReceiptDraft
+import dk.kvitteringsarkiv.app.data.ReceiptRecord
 import dk.kvitteringsarkiv.app.scan.OcrService
 import dk.kvitteringsarkiv.app.scan.ReceiptParser
 import dk.kvitteringsarkiv.app.storage.SafStorageProvider
@@ -26,7 +28,7 @@ import java.io.File
 import java.util.UUID
 
 class MainActivity : ComponentActivity() {
-    private enum class Screen { HOME, REVIEW, SETTINGS }
+    private enum class Screen { HOME, REVIEW, SETTINGS, DETAIL }
     private data class Pending(val draft: ReceiptDraft, val pdf: File)
 
     private val db by lazy { ReceiptDatabase(this) }
@@ -37,6 +39,7 @@ class MainActivity : ComponentActivity() {
     private var receipts by mutableStateOf(emptyList<dk.kvitteringsarkiv.app.data.ReceiptRecord>())
     private var errorMessage by mutableStateOf<String?>(null)
     private var saving by mutableStateOf(false)
+    private var selectedReceipt by mutableStateOf<ReceiptRecord?>(null)
 
     private val scannerLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { activityResult ->
         if (activityResult.resultCode != Activity.RESULT_OK) return@registerForActivityResult
@@ -82,9 +85,29 @@ class MainActivity : ComponentActivity() {
         setContent {
             KvitteringsTheme {
                 when (screen) {
-                    Screen.HOME -> HomeScreen(receipts, query, ::onQueryChange, ::startScanner) { screen = Screen.SETTINGS }
+                    Screen.HOME -> HomeScreen(
+                        receipts = receipts,
+                        query = query,
+                        onQueryChange = ::onQueryChange,
+                        onScan = ::startScanner,
+                        onReceiptClick = { receipt ->
+                            selectedReceipt = receipt
+                            screen = Screen.DETAIL
+                        },
+                        onSettings = { screen = Screen.SETTINGS },
+                    )
                     Screen.REVIEW -> pending?.let { p -> ReviewScreen(p.draft, ::cancelReview, ::saveReceipt, saving) }
                     Screen.SETTINGS -> SettingsScreen(storageSettings.safRootUri?.toString(), { folderPicker.launch(storageSettings.safRootUri) }) { screen = Screen.HOME }
+                    Screen.DETAIL -> selectedReceipt?.let { receipt ->
+                        ReceiptDetailScreen(
+                            receipt = receipt,
+                            onOpenPdf = { openStoredPdf(receipt) },
+                            onBack = {
+                                selectedReceipt = null
+                                screen = Screen.HOME
+                            },
+                        )
+                    }
                 }
                 errorMessage?.let { message ->
                     AlertDialog(
@@ -152,6 +175,42 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshReceipts() {
         receipts = db.search(query)
+    }
+
+    private fun openStoredPdf(receipt: ReceiptRecord) {
+        if (receipt.storageProvider != SafStorageProvider.ID) {
+            errorMessage = "Denne lagringstype kan ikke åbnes endnu."
+            return
+        }
+
+        val uri = resolveStoredPdf(receipt.storagePath)
+        if (uri == null) {
+            errorMessage = "PDF-filen kunne ikke findes i den valgte kvitteringsmappe."
+            return
+        }
+
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/pdf")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        runCatching {
+            startActivity(Intent.createChooser(intent, "Åbn kvittering"))
+        }.onFailure {
+            errorMessage = "Der blev ikke fundet en app, som kan åbne PDF-filen."
+        }
+    }
+
+    private fun resolveStoredPdf(storagePath: String): Uri? {
+        val rootUri = storageSettings.safRootUri ?: return null
+        var current = DocumentFile.fromTreeUri(this, rootUri) ?: return null
+        val segments = storagePath.split(" / ").map { it.trim() }.filter { it.isNotBlank() }
+
+        for (segment in segments) {
+            current = current.findFile(segment) ?: return null
+        }
+
+        return current.takeIf { it.isFile }?.uri
     }
 
     private fun copyPdfToCache(uri: Uri): File? = runCatching {
