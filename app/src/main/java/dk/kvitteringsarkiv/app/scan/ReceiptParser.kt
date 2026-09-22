@@ -45,11 +45,18 @@ object ReceiptParser {
     private val amountRegex = Regex("(?<!\\d)(\\d{1,3}(?:[ .]\\d{3})*|\\d+)[,.](\\d{2})(?!\\d)")
     private val totalWords = listOf("total", "i alt", "ialt", "at betale", "beløb", "beloeb", "sum")
 
-    fun parse(text: String, today: LocalDate = LocalDate.now()): ReceiptDraft {
-        val supplier = detectSupplier(text)
-        val detectedDate = detectDate(text)
+    fun parse(text: String, today: LocalDate = LocalDate.now()): ReceiptDraft =
+        parseCandidates(listOf(text), today)
+
+    fun parseCandidates(texts: List<String>, today: LocalDate = LocalDate.now()): ReceiptDraft {
+        val clean = texts.filter { it.isNotBlank() }
+        val combined = clean.joinToString("\n")
+        val bestText = clean.maxByOrNull(::textQualityScore).orEmpty()
+
+        val supplier = detectSupplier(combined)
+        val detectedDate = detectDate(combined)
         val date = detectedDate ?: today
-        val total = detectTotal(text)
+        val total = detectTotal(combined)
 
         var confidence = 0.10f
         if (supplier != "Ukendt leverandør") confidence += 0.40f
@@ -60,9 +67,20 @@ object ReceiptParser {
             supplier = supplier,
             purchaseDate = date,
             total = total,
-            ocrText = text,
+            ocrText = bestText,
             confidence = confidence.coerceAtMost(1f),
+            purchaseDateDetected = detectedDate != null,
         )
+    }
+
+    private fun textQualityScore(text: String): Int {
+        var score = text.count { it.isLetterOrDigit() }
+        val normalized = normalize(text)
+        if ("total" in normalized) score += 120
+        if (detectDate(text) != null) score += 140
+        if (detectSupplier(text) != "Ukendt leverandør") score += 160
+        if (amountRegex.containsMatchIn(text)) score += 60
+        return score
     }
 
     private fun detectSupplier(original: String): String {
