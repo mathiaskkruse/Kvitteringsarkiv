@@ -39,6 +39,7 @@ fun HomeScreen(
     query: String,
     onQueryChange: (String) -> Unit,
     onScan: () -> Unit,
+    onReceiptClick: (ReceiptRecord) -> Unit,
     onSettings: () -> Unit,
 ) {
     Scaffold(
@@ -70,7 +71,9 @@ fun HomeScreen(
                 }
             } else {
                 LazyColumn(contentPadding = PaddingValues(bottom = 100.dp)) {
-                    items(receipts, key = { it.id }) { receipt -> ReceiptRow(receipt) }
+                    items(receipts, key = { it.id }) { receipt ->
+                        ReceiptRow(receipt, onClick = { onReceiptClick(receipt) })
+                    }
                 }
             }
         }
@@ -78,13 +81,81 @@ fun HomeScreen(
 }
 
 @Composable
-private fun ReceiptRow(receipt: ReceiptRecord) {
+private fun ReceiptRow(receipt: ReceiptRecord, onClick: () -> Unit) {
     ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
         headlineContent = { Text(receipt.supplier, fontWeight = FontWeight.Medium) },
         supportingContent = { Text("${receipt.purchaseDate.dkDate()} · ${receipt.storagePath}", maxLines = 2) },
-        trailingContent = { receipt.total?.let { Text(it.dkAmount()) } },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                receipt.total?.let { Text(it.dkAmount()) }
+                Spacer(Modifier.width(8.dp))
+                Text("›", style = MaterialTheme.typography.titleLarge)
+            }
+        },
     )
     HorizontalDivider()
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReceiptDetailScreen(
+    receipt: ReceiptRecord,
+    onOpenPdf: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Scaffold(topBar = { TopAppBar(title = { Text("Kvittering") }) }) { padding ->
+        Column(
+            Modifier.padding(padding).padding(16.dp).fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Card(shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(receipt.supplier, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    HorizontalDivider()
+                    DetailLine("Dato", receipt.purchaseDate.dkDate())
+                    DetailLine("Beløb", receipt.total?.dkAmount() ?: "Ikke fundet")
+                    DetailLine("Placering", receipt.storagePath)
+                }
+            }
+
+            Button(
+                onClick = onOpenPdf,
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+            ) {
+                Text("Åbn PDF")
+            }
+
+            Card(shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().weight(1f)) {
+                Column(Modifier.padding(18.dp)) {
+                    Text("Genkendt tekst", fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    LazyColumn {
+                        item {
+                            Text(
+                                receipt.ocrText.ifBlank { "Ingen OCR-tekst gemt." },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
+            OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+                Text("Tilbage")
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailLine(label: String, value: String) {
+    Column {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyLarge)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
