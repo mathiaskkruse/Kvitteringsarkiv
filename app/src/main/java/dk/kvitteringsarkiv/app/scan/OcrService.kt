@@ -8,12 +8,24 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 object OcrService {
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private fun deliverSuccess(onSuccess: (List<String>) -> Unit, texts: List<String>) {
+        mainHandler.post { onSuccess(texts) }
+    }
+
+    private fun deliverFailure(onFailure: (Throwable) -> Unit, error: Throwable) {
+        mainHandler.post { onFailure(error) }
+    }
+
     fun recognize(
         context: Context,
         imageUri: Uri,
@@ -31,22 +43,22 @@ object OcrService {
                         val variants = runCatching { createEnhancedVariants(context, imageUri) }.getOrDefault(emptyList())
                         if (variants.isEmpty()) {
                             recognizer.close()
-                            onSuccess(texts.filter { it.isNotBlank() })
+                            deliverSuccess(onSuccess, texts.filter { it.isNotBlank() })
                         } else {
                             recognizeVariants(recognizer, variants, 0, texts) { finalTexts ->
                                 recognizer.close()
-                                onSuccess(finalTexts.filter { it.isNotBlank() }.distinct())
+                                deliverSuccess(onSuccess, finalTexts.filter { it.isNotBlank() }.distinct())
                             }
                         }
                     }.start()
                 }
                 .addOnFailureListener { error ->
                     recognizer.close()
-                    onFailure(error)
+                    deliverFailure(onFailure, error)
                 }
         } catch (error: Throwable) {
             recognizer.close()
-            onFailure(error)
+            deliverFailure(onFailure, error)
         }
     }
 
