@@ -58,8 +58,8 @@ class MainActivity : ComponentActivity() {
         }
 
         OcrService.recognize(this, imageUri,
-            onSuccess = { text ->
-                pending = Pending(ReceiptParser.parse(text), cachedPdf)
+            onSuccess = { texts ->
+                pending = Pending(ReceiptParser.parseCandidates(texts), cachedPdf)
                 screen = Screen.REVIEW
             },
             onFailure = { error ->
