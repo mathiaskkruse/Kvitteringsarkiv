@@ -20,6 +20,20 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Restore stable debug signing key
+        id: debug-key-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: kvitteringsarkiv-debug-keystore-v1
+
+      - name: Create debug signing key on first build
+        if: steps.debug-key-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair             -keystore "$HOME/.android/debug.keystore"             -storepass android             -alias androiddebugkey             -keypass android             -keyalg RSA             -keysize 2048             -validity 10000             -dname "CN=Android Debug,O=Kvitteringsarkiv,C=DK"
+
       - name: Install Android SDK 36
         shell: bash
         run: |
