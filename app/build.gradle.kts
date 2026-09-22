@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "dk.kvitteringsarkiv.app"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dk.kvitteringsarkiv.app"
