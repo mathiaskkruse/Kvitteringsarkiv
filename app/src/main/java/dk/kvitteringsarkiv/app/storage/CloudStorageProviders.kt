@@ -20,4 +20,3 @@ abstract class CloudStorageProvider(
 
 class GoogleDriveStorageProvider : CloudStorageProvider("google_drive", "Google Drive")
 class OneDriveStorageProvider : CloudStorageProvider("onedrive", "OneDrive")
-class DropboxStorageProvider : CloudStorageProvider("dropbox", "Dropbox")
