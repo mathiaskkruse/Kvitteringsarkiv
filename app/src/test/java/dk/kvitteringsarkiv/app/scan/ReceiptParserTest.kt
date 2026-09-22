@@ -2,6 +2,8 @@ package dk.kvitteringsarkiv.app.scan
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -46,6 +48,7 @@ class ReceiptParserTest {
         assertEquals("Føtex", r.supplier)
         assertEquals(LocalDate.of(2026, 8, 22), r.purchaseDate)
         assertEquals(BigDecimal("202.22"), r.total)
+        assertTrue(r.purchaseDateDetected)
     }
 
     @Test fun fuzzyMatchesBadFotexOcr() {
@@ -59,6 +62,32 @@ class ReceiptParserTest {
         val r = ReceiptParser.parse(text, LocalDate.of(2026, 9, 22))
         assertEquals("Føtex", r.supplier)
         assertEquals(LocalDate.of(2026, 8, 22), r.purchaseDate)
+    }
+
+    @Test fun multiPassCanRecoverDateFromAnotherOcrCandidate() {
+        val weak = """
+            FØTEX
+            TOTAL 202,22
+            22 Da 26
+        """.trimIndent()
+        val better = """
+            FOTEX KORSOR 22 08 26
+            TOTAL 202,22
+        """.trimIndent()
+
+        val r = ReceiptParser.parseCandidates(listOf(weak, better), LocalDate.of(2026, 9, 22))
+        assertEquals("Føtex", r.supplier)
+        assertEquals(LocalDate.of(2026, 8, 22), r.purchaseDate)
+        assertTrue(r.purchaseDateDetected)
+    }
+
+    @Test fun missingDateIsMarkedAsUncertainInsteadOfSilentlyTrusted() {
+        val r = ReceiptParser.parse(
+            "FØTEX\nTOTAL 202,22\n22 Da 26",
+            LocalDate.of(2026, 9, 22),
+        )
+        assertEquals(LocalDate.of(2026, 9, 22), r.purchaseDate)
+        assertFalse(r.purchaseDateDetected)
     }
 
     @Test fun unknownSupplierDoesNotInventRandomLine() {
