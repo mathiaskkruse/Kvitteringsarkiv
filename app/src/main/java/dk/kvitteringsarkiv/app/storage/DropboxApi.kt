@@ -122,7 +122,7 @@ object DropboxApi {
 
     private fun upload(token: String, remotePath: String, sourcePdf: File): String {
         val conn = URL("$CONTENT/files/upload").openConnection() as HttpURLConnection
-        try {
+        return try {
             conn.requestMethod = "POST"
             conn.setRequestProperty("Authorization", "Bearer $token")
             conn.setRequestProperty("Content-Type", "application/octet-stream")
