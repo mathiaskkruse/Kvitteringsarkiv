@@ -167,7 +167,9 @@ fun ReviewScreen(
     saving: Boolean,
 ) {
     var supplier by remember(initial) { mutableStateOf(initial.supplier) }
-    var dateText by remember(initial) { mutableStateOf(initial.purchaseDate.toString()) }
+    var dateText by remember(initial) {
+        mutableStateOf(if (initial.purchaseDateDetected) initial.purchaseDate.toString() else "")
+    }
     var amountText by remember(initial) { mutableStateOf(initial.total?.toPlainString()?.replace('.', ',') ?: "") }
 
     Scaffold(topBar = { TopAppBar(title = { Text("Kontrollér kvittering") }) }) { padding ->
@@ -177,7 +179,16 @@ fun ReviewScreen(
         ) {
             Text("Scanningen er klar. Ret felterne hvis OCR'en har læst noget forkert.")
             OutlinedTextField(supplier, { supplier = it }, label = { Text("Butik / leverandør") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(dateText, { dateText = it }, label = { Text("Dato (ÅÅÅÅ-MM-DD)") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                value = dateText,
+                onValueChange = { dateText = it },
+                label = { Text("Dato (ÅÅÅÅ-MM-DD)") },
+                modifier = Modifier.fillMaxWidth(),
+                isError = dateText.isBlank(),
+                supportingText = {
+                    if (dateText.isBlank()) Text("Datoen kunne ikke aflæses sikkert – udfyld den før du gemmer.")
+                },
+            )
             OutlinedTextField(amountText, { amountText = it }, label = { Text("Beløb") }, modifier = Modifier.fillMaxWidth())
 
             val previewDraft = runCatching {
@@ -185,6 +196,7 @@ fun ReviewScreen(
                     supplier = supplier.trim().ifBlank { "Ukendt leverandør" },
                     purchaseDate = LocalDate.parse(dateText),
                     total = amountText.trim().takeIf { it.isNotBlank() }?.replace(".", "")?.replace(',', '.')?.let(::BigDecimal),
+                    purchaseDateDetected = true,
                 )
             }.getOrNull()
 
