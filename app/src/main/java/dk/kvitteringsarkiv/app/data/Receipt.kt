@@ -11,6 +11,7 @@ data class ReceiptDraft(
     val receiptNumber: String? = null,
     val ocrText: String,
     val confidence: Float = 0f,
+    val purchaseDateDetected: Boolean = true,
 )
 
 data class ReceiptRecord(
