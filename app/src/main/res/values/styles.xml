@@ -3,7 +3,8 @@
     <style name="Theme.Kvitteringsarkiv" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/white</item>
+        <item name="android:statusBarColor">@color/sand_bg</item>
+        <item name="android:navigationBarColor">@color/sand_bg</item>
+        <item name="android:windowActionModeOverlay">true</item>
     </style>
 </resources>
